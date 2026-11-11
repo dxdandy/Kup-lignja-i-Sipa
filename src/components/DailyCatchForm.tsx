@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CompetitionState, Member, CatchEntry } from '../types';
-import { apiUrl } from '../utils/api';
+import { apiUrl, parseJsonIfValid, saveCatchEntryLocally, saveLocalCompetitionState } from '../utils/api';
 import confetti from 'canvas-confetti';
 import {
   Save,
@@ -125,28 +125,48 @@ export const DailyCatchForm: React.FC<DailyCatchFormProps> = ({
     setIsSaving(true);
     setFeedbackMessage(null);
 
+    const payload = {
+      currentUserId: currentUser.id,
+      targetMemberId: selectedMemberId,
+      date: selectedDate,
+      squidCount,
+      cuttlefishCount,
+      squidWeightKg: squidWeightKg ? parseFloat(squidWeightKg) : 0,
+      cuttlefishWeightKg: cuttlefishWeightKg ? parseFloat(cuttlefishWeightKg) : 0,
+      biggestCatchGrams: biggestCatchGrams ? parseInt(biggestCatchGrams, 10) : 0,
+      locationNotes,
+      lureNotes,
+    };
+
     try {
-      const response = await fetch(apiUrl('/api/entry'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentUserId: currentUser.id,
-          targetMemberId: selectedMemberId,
-          date: selectedDate,
-          squidCount,
-          cuttlefishCount,
-          squidWeightKg: squidWeightKg ? parseFloat(squidWeightKg) : 0,
-          cuttlefishWeightKg: cuttlefishWeightKg ? parseFloat(cuttlefishWeightKg) : 0,
-          biggestCatchGrams: biggestCatchGrams ? parseInt(biggestCatchGrams, 10) : 0,
-          locationNotes,
-          lureNotes,
-        }),
-      });
+      let savedViaServer = false;
+      try {
+        const response = await fetch(apiUrl('/api/entry'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await parseJsonIfValid(response);
+        if (data?.success && data?.state) {
+          saveLocalCompetitionState(data.state);
+          savedViaServer = true;
+        } else if (response.status === 403 || response.status === 400) {
+          const errData = await response.json().catch(() => ({}));
+          if (errData.error) {
+            throw new Error(errData.error);
+          }
+        }
+      } catch (fetchErr: any) {
+        if (fetchErr?.message?.includes('ovlasti')) {
+          throw fetchErr;
+        }
+      }
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Neuspjelo spremanje.');
+      if (!savedViaServer) {
+        const localRes = saveCatchEntryLocally(payload);
+        if (localRes.error) {
+          throw new Error(localRes.error);
+        }
       }
 
       // Trigger celebration confetti
@@ -163,7 +183,7 @@ export const DailyCatchForm: React.FC<DailyCatchFormProps> = ({
 
       setFeedbackMessage({
         type: 'success',
-        text: `Ulov za ${state.members.find((m) => m.id === selectedMemberId)?.name} (${selectedDate}) je uspješno spremljen i odmah vidljiv svim članovima!`,
+        text: `Ulov za ${state.members.find((m) => m.id === selectedMemberId)?.name} (${selectedDate}) je uspješno spremljen!`,
       });
 
       onSaveSuccess();

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Member } from '../types';
-import { apiUrl } from '../utils/api';
+import { apiUrl, parseJsonIfValid, verifyPinLocally } from '../utils/api';
 import { X, Lock, Shield, UserCheck, AlertCircle, KeyRound, Sparkles } from 'lucide-react';
 
 interface LoginModalProps {
@@ -50,22 +50,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch(apiUrl('/api/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberId: selectedMember.id,
-          pin: pin.trim(),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Pogrešan PIN kod.');
+      let loggedInMember: Member | undefined;
+      try {
+        const res = await fetch(apiUrl('/api/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberId: selectedMember.id,
+            pin: pin.trim(),
+          }),
+        });
+        const data = await parseJsonIfValid(res);
+        if (data?.member) {
+          loggedInMember = data.member;
+        } else if (res.status === 401 || res.status === 404) {
+          const errData = await res.json().catch(() => ({}));
+          if (errData.error) {
+            throw new Error(errData.error);
+          }
+        }
+      } catch (fetchErr: any) {
+        if (fetchErr?.message?.includes('Pogrešan PIN')) {
+          throw fetchErr;
+        }
       }
 
-      onLoginSuccess(data.member);
+      if (!loggedInMember) {
+        const localResult = verifyPinLocally(selectedMember.id, pin.trim());
+        if (localResult.error || !localResult.member) {
+          throw new Error(localResult.error || 'Pogrešan PIN kod.');
+        }
+        loggedInMember = localResult.member;
+      }
+
+      onLoginSuccess(loggedInMember);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Greška pri prijavi.');
@@ -82,17 +100,33 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch(apiUrl('/api/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberId: member.id,
-          pin: testPin,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onLoginSuccess(data.member);
+      let loggedInMember: Member | undefined;
+      try {
+        const res = await fetch(apiUrl('/api/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberId: member.id,
+            pin: testPin,
+          }),
+        });
+        const data = await parseJsonIfValid(res);
+        if (data?.member) {
+          loggedInMember = data.member;
+        }
+      } catch {
+        // fallback to local verification
+      }
+
+      if (!loggedInMember) {
+        const localResult = verifyPinLocally(member.id, testPin);
+        if (localResult.error || !localResult.member) {
+          throw new Error(localResult.error || 'Greška pri brzoj prijavi.');
+        }
+        loggedInMember = localResult.member;
+      }
+
+      onLoginSuccess(loggedInMember);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Greška pri brzoj prijavi.');

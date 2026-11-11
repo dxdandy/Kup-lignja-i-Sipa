@@ -390,7 +390,7 @@ app.post('/api/reset', (req: Request, res: Response) => {
 });
 
 // 6.1. Live OTA Version Information
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const APP_BUILD_TIMESTAMP = new Date().toISOString();
 
 app.get('/api/app-version', (_req: Request, res: Response) => {
@@ -402,12 +402,10 @@ app.get('/api/app-version', (_req: Request, res: Response) => {
     minVersion: '1.0.0',
     otaChannel: 'production-live',
     features: [
-      'Riješena greška učitavanja na mobitelima i omogućena trenutna offline i online dostupnost',
-      'Ispravljen rad navigacijskih tabova (Tablica poretka, Dnevni unos, Solunar AI, Dnevnik)',
-      'Automatsko povezivanje s bazom u Novom Vinodolskom iz APK aplikacije',
-      'Povlačenje ekrana prema dolje za trenutno Live OTA ažuriranje',
-      'Bočne geste pametnih telefona za korak unazad i izlazak',
-      'Korisnički PIN-ovi (Tuna: 1234, Silvio: 9876, Daniel: 2026)',
+      'Tiho pozadinsko Live OTA ažuriranje pri pokretanju aplikacije bez skočnih prozora',
+      'Uklonjena greška Webpage not available (ERR_HTTP_RESPONSE_CODE_FAILURE) na mobitelima',
+      'Potpuna podrška za sve tabove (Tablica poretka, Dnevni unos, Solunar & AI, Dnevnik) u APK i web verziji',
+      'Prikaz točne verzije aplikacije u podnožju ekrana (v1.3.0)',
     ],
   });
 });

@@ -1,0 +1,14 @@
+{
+  "version": "1.3.0",
+  "buildTimestamp": "2026-11-11T20:22:00.000Z",
+  "appName": "Lignjolov",
+  "apkName": "Lignjolov_v1.3.0.apk",
+  "minVersion": "1.0.0",
+  "otaChannel": "production-live",
+  "features": [
+    "Tiho pozadinsko Live OTA ažuriranje pri pokretanju aplikacije bez skočnih prozora",
+    "Uklonjena greška Webpage not available (ERR_HTTP_RESPONSE_CODE_FAILURE) na mobitelima",
+    "Potpuna podrška za sve tabove (Tablica poretka, Dnevni unos, Solunar & AI, Dnevnik) u APK i web verziji",
+    "Prikaz točne verzije aplikacije u podnožju ekrana (v1.3.0)"
+  ]
+}

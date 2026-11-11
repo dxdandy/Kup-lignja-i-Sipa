@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CompetitionState, Member, CatchEntry } from '../types';
-import { apiUrl } from '../utils/api';
+import { apiUrl, parseJsonIfValid, deleteCatchEntryLocally, saveLocalCompetitionState } from '../utils/api';
 import { Calendar, Trash2, Edit3, MapPin, Anchor, Filter, Clock, AlertCircle } from 'lucide-react';
 
 interface AllEntriesLogProps {
@@ -25,21 +25,30 @@ export const AllEntriesLog: React.FC<AllEntriesLogProps> = ({
 
   const handleDelete = async (entryId: string) => {
     if (!currentUser) return;
-    if (!window.confirm('Jeste li sigurni da želite obrisati ovaj ulov?')) return;
 
     setIsDeletingId(entryId);
     try {
-      const res = await fetch(apiUrl(`/api/entry/${entryId}?currentUserId=${currentUser.id}`), {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || 'Neuspjelo brisanje.');
-      } else {
-        onRefresh();
+      let deletedViaServer = false;
+      try {
+        const res = await fetch(apiUrl(`/api/entry/${entryId}?currentUserId=${currentUser.id}`), {
+          method: 'DELETE',
+        });
+        const data = await parseJsonIfValid(res);
+        if (data?.success && data?.state) {
+          saveLocalCompetitionState(data.state);
+          deletedViaServer = true;
+        }
+      } catch {
+        // fallback to local delete
       }
-    } catch (err: any) {
-      alert('Greška pri brisanju zapisa.');
+
+      if (!deletedViaServer) {
+        deleteCatchEntryLocally(entryId, currentUser.id);
+      }
+
+      onRefresh();
+    } catch (err) {
+      console.warn('Greška pri brisanju zapisa:', err);
     } finally {
       setIsDeletingId(null);
     }

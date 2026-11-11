@@ -39,7 +39,7 @@ export const ApkGitHubModal: React.FC<ApkGitHubModalProps> = ({
   onClose,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'ota' | 'apk'>('ota');
-  const [versionNumber, setVersionNumber] = useState<string>('1.2.0');
+  const [versionNumber, setVersionNumber] = useState<string>('1.3.0');
   const [appName, setAppName] = useState<string>('Lignjolov');
   const [copiedWorkflow, setCopiedWorkflow] = useState<boolean>(false);
   const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SolunarDayForecast, AISolunarAdvice } from '../types';
-import { apiUrl } from '../utils/api';
+import { apiUrl, parseJsonIfValid, getLocalAISolunarAdvice } from '../utils/api';
 import {
   Moon,
   Sun,
@@ -91,39 +91,40 @@ export const SolunarCalculator: React.FC = () => {
     setIsLoadingForecast(true);
     try {
       const res = await fetch(apiUrl('/api/solunar'));
-      if (res.ok) {
-        const data = await res.json();
-        if (data.forecasts && data.forecasts.length > 0) {
-          setForecasts(data.forecasts);
-        }
+      const data = await parseJsonIfValid(res);
+      if (data?.forecasts && data.forecasts.length > 0) {
+        setForecasts(data.forecasts);
       }
-    } catch (err) {
-      console.warn('Greška pri dohvaćanju solunarnih podataka (koriste se lokalni izračuni):', err);
+    } catch {
+      // Uses built-in FALLBACK_FORECASTS
     } finally {
       setIsLoadingForecast(false);
     }
   };
 
-  // Fetch Google AI Gemini advice
+  // Fetch Google AI Gemini advice with automatic local fallback
   const fetchAiAdvice = async () => {
     setIsLoadingAI(true);
+    const currentForecast = forecasts[selectedHorizon];
+    const targetDate = currentForecast?.date || '2026-11-18';
     try {
-      const currentForecast = forecasts[selectedHorizon];
       const res = await fetch(apiUrl('/api/ai-solunar-forecast'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          targetDate: currentForecast?.date || '2026-11-18',
+          targetDate,
           targetSpecies: aiSpeciesFocus,
           weatherNote: 'Jesensko more u Vinodolskom kanalu, temperatura 15°C, umjeren kurenat',
         }),
       });
-      const data = await res.json();
-      if (data.data) {
+      const data = await parseJsonIfValid(res);
+      if (data?.data) {
         setAiAdvice(data.data);
+      } else {
+        setAiAdvice(getLocalAISolunarAdvice(targetDate, aiSpeciesFocus));
       }
-    } catch (err) {
-      console.warn('Greška pri dohvaćanju AI analize:', err);
+    } catch {
+      setAiAdvice(getLocalAISolunarAdvice(targetDate, aiSpeciesFocus));
     } finally {
       setIsLoadingAI(false);
     }
