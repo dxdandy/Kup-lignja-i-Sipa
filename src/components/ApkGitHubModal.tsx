@@ -112,11 +112,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Instaliraj ovisnosti i izgradi Web App
         run: |
-          npm ci
+          npm install --legacy-peer-deps
           npm run build
 
       - name: Izvuci verziju iz package.json ili taga
@@ -140,8 +139,8 @@ jobs:
 
       - name: Inicijaliziraj Capacitor i postavi ikonu aplikacije
         run: |
-          npm install @capacitor/core @capacitor/android @capacitor/cli
-          npx cap add android
+          npm install --legacy-peer-deps @capacitor/core @capacitor/android @capacitor/cli
+          npx cap add android || true
           # Kopiraj prilagođenu ikonu lignje s bijelom podlogom
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
