@@ -108,17 +108,17 @@ jobs:
       - name: Checkout koda
         uses: actions/checkout@v4
 
-      - name: Postavi Node.js
+      - name: Postavi Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Instaliraj ovisnosti i izgradi Web App
         run: |
           npm install --legacy-peer-deps
           npm run build
 
-      - name: Izvuci verziju iz package.json ili taga
+      - name: Izvuci verziju iz unosa ili package.json
         id: get_version
         run: |
           if [ -n "\${{ github.event.inputs.version }}" ]; then
@@ -134,14 +134,16 @@ jobs:
       - name: Postavi Java JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Inicijaliziraj Capacitor i postavi ikonu aplikacije
+      - name: Dodaj Capacitor Android platformu i postavi ikonu lignje s bijelom podlogom
         run: |
           npm install --legacy-peer-deps @capacitor/core @capacitor/android @capacitor/cli
-          npx cap add android || true
-          # Kopiraj prilagođenu ikonu lignje s bijelom podlogom
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          # Postavi prilagođenu ikonu lignje na bijeloj podlozi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xhdpi
@@ -153,20 +155,24 @@ jobs:
           cp public/icon.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
           cp public/icon.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
           # Zaključaj vertikalni (portrait) položaj u AndroidManifest.xml
-          sed -i 's/<activity /<activity android:screenOrientation="portrait" /g' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<activity /<activity android:screenOrientation="portrait" /g' android/app/src/main/AndroidManifest.xml || true
           npx cap sync android
+          chmod +x android/gradlew
 
-      - name: Izgradi Android APK
+      - name: Izgradi instalacijski Android APK pomoću Gradlea
         working-directory: android
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleDebug
 
-      - name: Imenuj APK s verzijom (${appName}_v\${{ env.APP_VERSION }}.apk)
+      - name: Preimenuj APK u format s verzijom (${appName}_v\${{ env.APP_VERSION }}.apk)
         run: |
           mkdir -p release-apks
-          ORIGINAL_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
-          VERSIONED_APK="release-apks/${appName}_v\${{ env.APP_VERSION }}.apk"
-          cp $ORIGINAL_APK $VERSIONED_APK
-          echo "Konačni APK stvoren: $VERSIONED_APK"
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp "android/app/build/outputs/apk/debug/app-debug.apk" "release-apks/${appName}_v\${{ env.APP_VERSION }}.apk"
+          elif [ -f "android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+            cp "android/app/build/outputs/apk/release/app-release-unsigned.apk" "release-apks/${appName}_v\${{ env.APP_VERSION }}.apk"
+          fi
+          echo "Konačni APK stvoren u release-apks/"
+          ls -la release-apks/
 
       - name: Prenesi gotov APK u GitHub Artefakte
         uses: actions/upload-artifact@v4
