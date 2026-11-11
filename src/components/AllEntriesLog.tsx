@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CompetitionState, Member, CatchEntry } from '../types';
+import { apiUrl } from '../utils/api';
 import { Calendar, Trash2, Edit3, MapPin, Anchor, Filter, Clock, AlertCircle } from 'lucide-react';
 
 interface AllEntriesLogProps {
@@ -28,7 +29,7 @@ export const AllEntriesLog: React.FC<AllEntriesLogProps> = ({
 
     setIsDeletingId(entryId);
     try {
-      const res = await fetch(`/api/entry/${entryId}?currentUserId=${currentUser.id}`, {
+      const res = await fetch(apiUrl(`/api/entry/${entryId}?currentUserId=${currentUser.id}`), {
         method: 'DELETE',
       });
       if (!res.ok) {

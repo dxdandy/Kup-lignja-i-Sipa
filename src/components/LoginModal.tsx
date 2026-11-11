@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Member } from '../types';
+import { apiUrl } from '../utils/api';
 import { X, Lock, Shield, UserCheck, AlertCircle, KeyRound, Sparkles } from 'lucide-react';
 
 interface LoginModalProps {
@@ -49,7 +50,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -81,7 +82,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

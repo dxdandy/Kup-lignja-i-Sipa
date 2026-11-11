@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CompetitionState, Member, CatchEntry } from '../types';
+import { apiUrl } from '../utils/api';
 import confetti from 'canvas-confetti';
 import {
   Save,
@@ -125,7 +126,7 @@ export const DailyCatchForm: React.FC<DailyCatchFormProps> = ({
     setFeedbackMessage(null);
 
     try {
-      const response = await fetch('/api/entry', {
+      const response = await fetch(apiUrl('/api/entry'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

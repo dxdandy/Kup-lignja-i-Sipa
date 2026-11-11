@@ -1,9 +1,11 @@
 {
   "appId": "com.lignjolov.novivinodolski",
-  "appName": "Kup Lignja & Sipa",
+  "appName": "Lignjolov",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "url": "https://ais-pre-wb3fx5qrmhv4x24j6xxbnk-294488753863.europe-west2.run.app",
+    "cleartext": true
   }
 }

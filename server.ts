@@ -15,6 +15,18 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json());
 
+// Enable CORS for mobile apps (Capacitor/WebView) and cross-origin requests
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  next();
+});
+
 // Initialize Google Gemini AI client
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -378,23 +390,24 @@ app.post('/api/reset', (req: Request, res: Response) => {
 });
 
 // 6.1. Live OTA Version Information
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.2.0';
 const APP_BUILD_TIMESTAMP = new Date().toISOString();
 
 app.get('/api/app-version', (_req: Request, res: Response) => {
   res.json({
     version: APP_VERSION,
     buildTimestamp: APP_BUILD_TIMESTAMP,
-    appName: 'Kup Lignja & Sipa Novi Vinodolski',
-    apkName: `Lignjolov_NoviVinodolski_v${APP_VERSION}.apk`,
+    appName: 'Lignjolov',
+    apkName: `Lignjolov_v${APP_VERSION}.apk`,
     minVersion: '1.0.0',
     otaChannel: 'production-live',
     features: [
-      'Live OTA automatska provjera i ažuriranje bez ponovne instalacije APK-a',
-      'Real-time sinkronizacija ulova s bazom u Novom Vinodolskom',
-      'Ažurirani korisnički PIN-ovi (Tuna: 1234, Silvio: 9876, Daniel: 2026)',
-      'Solunarni kalkulator s Google AI za 24h, 48h i 72h',
-      'Službena ikona lignje s bijelom podlogom i zaključan vertikalni prikaz',
+      'Riješena greška učitavanja na mobitelima i omogućena trenutna offline i online dostupnost',
+      'Ispravljen rad navigacijskih tabova (Tablica poretka, Dnevni unos, Solunar AI, Dnevnik)',
+      'Automatsko povezivanje s bazom u Novom Vinodolskom iz APK aplikacije',
+      'Povlačenje ekrana prema dolje za trenutno Live OTA ažuriranje',
+      'Bočne geste pametnih telefona za korak unazad i izlazak',
+      'Korisnički PIN-ovi (Tuna: 1234, Silvio: 9876, Daniel: 2026)',
     ],
   });
 });

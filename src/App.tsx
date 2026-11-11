@@ -9,16 +9,80 @@ import { ApkGitHubModal } from './components/ApkGitHubModal';
 import { LoginModal } from './components/LoginModal';
 import { OrientationLockBanner } from './components/OrientationLockBanner';
 import { OTAUpdateBanner } from './components/OTAUpdateBanner';
+import { PullToRefreshIndicator } from './components/PullToRefreshIndicator';
+import { EdgeSwipeIndicator } from './components/EdgeSwipeIndicator';
+import { ExitConfirmModal } from './components/ExitConfirmModal';
 import { useOTAUpdate } from './hooks/useOTAUpdate';
-import { RefreshCw, Sparkles } from 'lucide-react';
+import { useMobileGestures } from './hooks/useMobileGestures';
+import { apiUrl } from './utils/api';
+import { RefreshCw, Sparkles, WifiOff } from 'lucide-react';
+
+const DEFAULT_COMPETITION_STATE: CompetitionState = {
+  competitionName: 'Kup Lignja & Sipa Novi Vinodolski 2026',
+  location: 'Novi Vinodolski (Kvarner, Hrvatska)',
+  startDate: '2026-11-18',
+  endDate: '2026-11-22',
+  members: [
+    {
+      id: 'daniel',
+      name: 'Daniel',
+      role: 'admin',
+      pin: '2026',
+      avatarColor: 'from-cyan-500 to-blue-600',
+      boatName: 'Kapetan / Admin',
+    },
+    {
+      id: 'dida',
+      name: 'Dida',
+      role: 'member',
+      pin: '0000',
+      hasNoSmartphone: true,
+      managedBy: 'daniel',
+      avatarColor: 'from-amber-500 to-orange-600',
+      boatName: 'Stari morski vuk',
+    },
+    {
+      id: 'tuna',
+      name: 'Tuna',
+      role: 'member',
+      pin: '1234',
+      avatarColor: 'from-blue-600 to-indigo-700',
+      boatName: 'Lovac na kapitalce',
+    },
+    {
+      id: 'silvio',
+      name: 'Silvio',
+      role: 'member',
+      pin: '9876',
+      avatarColor: 'from-emerald-500 to-teal-700',
+      boatName: 'Majstor za peškafondo',
+    },
+  ],
+  entries: [],
+  lastUpdate: new Date().toISOString(),
+};
 
 export default function App() {
-  const [competitionState, setCompetitionState] = useState<CompetitionState | null>(null);
+  const [competitionState, setCompetitionState] = useState<CompetitionState>(() => {
+    try {
+      const cached = localStorage.getItem('lignjolov_competition_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && Array.isArray(parsed.members) && parsed.members.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_COMPETITION_STATE;
+  });
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'entry' | 'solunar' | 'log'>('leaderboard');
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState<boolean>(false);
+  const [isExitModalOpen, setIsExitModalOpen] = useState<boolean>(false);
   const [initialEntryMemberId, setInitialEntryMemberId] = useState<string | undefined>(undefined);
   const [liveToast, setLiveToast] = useState<string | null>(null);
 
@@ -33,6 +97,79 @@ export default function App() {
     checkForUpdates,
     applyUpdate,
   } = useOTAUpdate();
+
+  // Mobile Gestures: Pull-to-refresh with instant OTA update & edge swipe navigation
+  const handlePullRefresh = async () => {
+    try {
+      await fetchState();
+      // Check for OTA updates per user request: if available, apply immediately!
+      const hasNewer = await checkForUpdates(true);
+      if (hasNewer) {
+        setLiveToast('🚀 Pronađeno novije OTA ažuriranje! Automatska instalacija...');
+        setTimeout(() => {
+          applyUpdate();
+        }, 350);
+      } else {
+        setLiveToast('✅ Podaci osvježeni • Najnovija verzija');
+        setTimeout(() => setLiveToast(null), 2500);
+      }
+    } catch (err) {
+      console.error('Pull to refresh failed:', err);
+    }
+  };
+
+  const handleBackStep = () => {
+    if (isExitModalOpen) {
+      setIsExitModalOpen(false);
+      return;
+    }
+    if (isApkModalOpen) {
+      setIsApkModalOpen(false);
+      return;
+    }
+    if (isLoginModalOpen) {
+      setIsLoginModalOpen(false);
+      return;
+    }
+    if (showUpdateModal) {
+      setShowUpdateModal(false);
+      return;
+    }
+    if (activeTab !== 'leaderboard') {
+      setActiveTab('leaderboard');
+      return;
+    }
+  };
+
+  const handleExitPrompt = () => {
+    setIsExitModalOpen(true);
+  };
+
+  const handleConfirmExit = () => {
+    setIsExitModalOpen(false);
+    try {
+      if ((navigator as any).app?.exitApp) {
+        (navigator as any).app.exitApp();
+      } else if ((window as any).Capacitor?.App?.exitApp) {
+        (window as any).Capacitor.App.exitApp();
+      } else {
+        window.close();
+      }
+    } catch {
+      // fallback
+    }
+  };
+
+  const isAtHome = activeTab === 'leaderboard' && !isLoginModalOpen && !isApkModalOpen && !isExitModalOpen;
+  const hasOpenModal = isLoginModalOpen || isApkModalOpen || isExitModalOpen || showUpdateModal;
+
+  const { pullDistance, isRefreshing, edgeSwipe } = useMobileGestures({
+    onRefresh: handlePullRefresh,
+    onBackStep: handleBackStep,
+    onExitApp: handleExitPrompt,
+    isAtHome,
+    hasOpenModal,
+  });
 
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -62,13 +199,20 @@ export default function App() {
   // Fetch initial state via REST
   const fetchState = async () => {
     try {
-      const res = await fetch('/api/state');
-      const data = await res.json();
-      if (data.state) {
-        setCompetitionState(data.state);
+      const res = await fetch(apiUrl('/api/state'));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.state) {
+          setCompetitionState(data.state);
+          try {
+            localStorage.setItem('lignjolov_competition_state', JSON.stringify(data.state));
+          } catch {
+            // ignore
+          }
+        }
       }
     } catch (err) {
-      console.error('Greška pri dohvaćanju stanja:', err);
+      console.warn('Greška pri dohvaćanju stanja (korištenje lokalnih podataka):', err);
     }
   };
 
@@ -78,7 +222,7 @@ export default function App() {
 
     const connectSSE = () => {
       try {
-        const es = new EventSource('/api/stream');
+        const es = new EventSource(apiUrl('/api/stream'));
         eventSourceRef.current = es;
 
         es.onopen = () => {
@@ -165,6 +309,18 @@ export default function App() {
       {/* Portrait orientation lock handler */}
       <OrientationLockBanner />
 
+      {/* Pull down to refresh indicator */}
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+      />
+
+      {/* Edge swipe back & exit gesture indicator */}
+      <EdgeSwipeIndicator
+        edgeSwipe={edgeSwipe}
+        isAtHome={isAtHome}
+      />
+
       {/* Floating OTA Update Banner if newer version is available */}
       <OTAUpdateBanner
         isUpdateAvailable={isUpdateAvailable && showUpdateModal}
@@ -195,46 +351,36 @@ export default function App() {
 
       {/* Main Responsive Fluid Container - Adapts to all phone screen sizes */}
       <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 safe-bottom">
-        {!competitionState ? (
-          <div className="py-24 text-center">
-            <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mx-auto mb-3" />
-            <h3 className="text-base font-bold text-white">Učitavanje podataka o natjecanju...</h3>
-            <p className="text-xs text-slate-400 mt-1">Povezivanje s bazom u Novom Vinodolskom</p>
-          </div>
-        ) : (
-          <>
-            {activeTab === 'leaderboard' && (
-              <Leaderboard
-                state={competitionState}
-                currentUser={currentUser}
-                onGoToEntry={handleGoToEntry}
-              />
-            )}
+        {activeTab === 'leaderboard' && (
+          <Leaderboard
+            state={competitionState}
+            currentUser={currentUser}
+            onGoToEntry={handleGoToEntry}
+          />
+        )}
 
-            {activeTab === 'entry' && (
-              <DailyCatchForm
-                state={competitionState}
-                currentUser={currentUser}
-                initialMemberId={initialEntryMemberId}
-                onSaveSuccess={() => {
-                  fetchState();
-                  setActiveTab('leaderboard');
-                }}
-                onOpenLogin={() => setIsLoginModalOpen(true)}
-              />
-            )}
+        {activeTab === 'entry' && (
+          <DailyCatchForm
+            state={competitionState}
+            currentUser={currentUser}
+            initialMemberId={initialEntryMemberId}
+            onSaveSuccess={() => {
+              fetchState();
+              setActiveTab('leaderboard');
+            }}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
+          />
+        )}
 
-            {activeTab === 'solunar' && <SolunarCalculator />}
+        {activeTab === 'solunar' && <SolunarCalculator />}
 
-            {activeTab === 'log' && (
-              <AllEntriesLog
-                state={competitionState}
-                currentUser={currentUser}
-                onEditEntry={handleEditEntryFromLog}
-                onRefresh={fetchState}
-              />
-            )}
-          </>
+        {activeTab === 'log' && (
+          <AllEntriesLog
+            state={competitionState}
+            currentUser={currentUser}
+            onEditEntry={handleEditEntryFromLog}
+            onRefresh={fetchState}
+          />
         )}
       </main>
 
@@ -282,6 +428,13 @@ export default function App() {
         onCheckForUpdates={checkForUpdates}
         onApplyUpdate={applyUpdate}
         onClose={() => setIsApkModalOpen(false)}
+      />
+
+      {/* Exit Confirmation Modal (triggered on edge swipe back at home) */}
+      <ExitConfirmModal
+        isOpen={isExitModalOpen}
+        onClose={() => setIsExitModalOpen(false)}
+        onConfirmExit={handleConfirmExit}
       />
     </div>
   );

@@ -15,6 +15,7 @@ import {
   ArrowUpCircle,
 } from 'lucide-react';
 import { OTAVersionInfo } from '../hooks/useOTAUpdate';
+import { apiUrl } from '../utils/api';
 
 interface ApkGitHubModalProps {
   isOpen: boolean;
@@ -38,8 +39,8 @@ export const ApkGitHubModal: React.FC<ApkGitHubModalProps> = ({
   onClose,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'ota' | 'apk'>('ota');
-  const [versionNumber, setVersionNumber] = useState<string>('1.0');
-  const [appName, setAppName] = useState<string>('Lignjolov_NoviVinodolski');
+  const [versionNumber, setVersionNumber] = useState<string>('1.2.0');
+  const [appName, setAppName] = useState<string>('Lignjolov');
   const [copiedWorkflow, setCopiedWorkflow] = useState<boolean>(false);
   const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null);
   const [isBroadcasting, setIsBroadcasting] = useState<boolean>(false);
@@ -64,7 +65,7 @@ export const ApkGitHubModal: React.FC<ApkGitHubModalProps> = ({
     setIsBroadcasting(true);
     setBroadcastStatus(null);
     try {
-      const res = await fetch('/api/ota-broadcast', {
+      const res = await fetch(apiUrl('/api/ota-broadcast'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +98,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Verzija aplikacije (npr. 1.0 ili 1.1)'
+        description: 'Verzija aplikacije (npr. 1.1.0)'
         required: false
         default: '${versionNumber}'
 
@@ -126,7 +127,7 @@ jobs:
           elif [[ "\${{ github.ref }}" == refs/tags/* ]]; then
             APP_VER="\${GITHUB_REF#refs/tags/v}"
           else
-            APP_VER=$(node -p "require('./package.json').version || '1.0'")
+            APP_VER=$(node -p "require('./package.json').version || '1.1.0'")
           fi
           echo "APP_VERSION=$APP_VER" >> $GITHUB_ENV
           echo "Verzija APK-a: $APP_VER"
@@ -137,23 +138,19 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Dodaj Capacitor Android platformu i postavi ikonu lignje s bijelom podlogom
+      - name: Dodaj Capacitor Android platformu i postavi ikonu aplikacije (Lignjolov)
         run: |
           npm install --legacy-peer-deps @capacitor/core @capacitor/android @capacitor/cli
           if [ ! -d "android" ]; then
             npx cap add android
           fi
-          # Postavi prilagođenu ikonu lignje na bijeloj podlozi
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xhdpi
-          mkdir -p android/app/src/main/res/mipmap-hdpi
-          mkdir -p android/app/src/main/res/mipmap-mdpi
-          cp public/icon.png android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          cp public/icon.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp public/icon.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp public/icon.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp public/icon.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          # Postavi ikonu lignje (identičnu onoj u gornjem lijevom kutu aplikacije)
+          for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+            mkdir -p "android/app/src/main/res/$dir"
+            cp public/icon.png "android/app/src/main/res/$dir/ic_launcher.png"
+            cp public/icon.png "android/app/src/main/res/$dir/ic_launcher_round.png"
+            cp public/icon.png "android/app/src/main/res/$dir/ic_launcher_foreground.png"
+          done
           # Zaključaj vertikalni (portrait) položaj u AndroidManifest.xml
           sed -i 's/<activity /<activity android:screenOrientation="portrait" /g' android/app/src/main/AndroidManifest.xml || true
           npx cap sync android
@@ -163,13 +160,13 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Preimenuj APK u format s verzijom (${appName}_v\${{ env.APP_VERSION }}.apk)
+      - name: Preimenuj APK u Lignjolov_v\${{ env.APP_VERSION }}.apk
         run: |
           mkdir -p release-apks
           if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-            cp "android/app/build/outputs/apk/debug/app-debug.apk" "release-apks/${appName}_v\${{ env.APP_VERSION }}.apk"
+            cp "android/app/build/outputs/apk/debug/app-debug.apk" "release-apks/Lignjolov_v\${{ env.APP_VERSION }}.apk"
           elif [ -f "android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
-            cp "android/app/build/outputs/apk/release/app-release-unsigned.apk" "release-apks/${appName}_v\${{ env.APP_VERSION }}.apk"
+            cp "android/app/build/outputs/apk/release/app-release-unsigned.apk" "release-apks/Lignjolov_v\${{ env.APP_VERSION }}.apk"
           fi
           echo "Konačni APK stvoren u release-apks/"
           ls -la release-apks/
@@ -177,7 +174,7 @@ jobs:
       - name: Prenesi gotov APK u GitHub Artefakte
         uses: actions/upload-artifact@v4
         with:
-          name: ${appName}_v\${{ env.APP_VERSION }}-apk
+          name: Lignjolov_v\${{ env.APP_VERSION }}-apk
           path: release-apks/*.apk
 
       - name: Stvori GitHub Release s verzijom
@@ -185,7 +182,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-apks/*.apk
-          name: "Lignjolov Kup v\${{ env.APP_VERSION }}"
+          name: "Lignjolov v\${{ env.APP_VERSION }}"
           draft: false
           prerelease: false
 `;
@@ -424,17 +421,17 @@ jobs:
                     />
                     <button
                       type="button"
-                      onClick={() => setVersionNumber('1.0')}
+                      onClick={() => setVersionNumber('1.1.0')}
                       className="text-[10px] bg-slate-800 text-slate-300 px-2 py-1 rounded font-mono"
                     >
-                      v1.0
+                      v1.1.0
                     </button>
                     <button
                       type="button"
-                      onClick={() => setVersionNumber('1.1')}
+                      onClick={() => setVersionNumber('1.2.0')}
                       className="text-[10px] bg-slate-800 text-slate-300 px-2 py-1 rounded font-mono"
                     >
-                      v1.1
+                      v1.2.0
                     </button>
                   </div>
                 </div>

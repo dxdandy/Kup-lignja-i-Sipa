@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiUrl, DEFAULT_PRODUCTION_BACKEND } from '../utils/api';
 
 export interface OTAVersionInfo {
   version: string;
@@ -11,14 +12,14 @@ export interface OTAVersionInfo {
 }
 
 export function useOTAUpdate() {
-  const [currentVersion, setCurrentVersion] = useState<string>('1.0.0');
+  const [currentVersion, setCurrentVersion] = useState<string>('1.2.0');
   const [remoteVersionInfo, setRemoteVersionInfo] = useState<OTAVersionInfo | null>(null);
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date>(new Date());
   const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
 
-  // Compare semantic versions
+  // Compare semantic versions (e.g. 1.2.0 vs 1.0.0)
   const compareVersions = (v1: string, v2: string) => {
     const parts1 = v1.split('.').map((p) => parseInt(p, 10) || 0);
     const parts2 = v2.split('.').map((p) => parseInt(p, 10) || 0);
@@ -34,14 +35,15 @@ export function useOTAUpdate() {
   const checkForUpdates = useCallback(async (manual = false) => {
     setIsChecking(true);
     try {
-      // Bust cache using query param
-      const res = await fetch(`/api/app-version?t=${Date.now()}`);
+      // Fetch remote version using universal apiUrl (works on both Web and APK)
+      const res = await fetch(apiUrl(`/api/app-version?t=${Date.now()}`));
       if (!res.ok) throw new Error('Neuspjelo dohvaćanje verzije.');
 
       const data: OTAVersionInfo = await res.json();
       setRemoteVersionInfo(data);
       setLastCheckedAt(new Date());
 
+      // Read local installed version or default
       const localVer = localStorage.getItem('lignjolov_installed_version') || '1.0.0';
       setCurrentVersion(localVer);
 
@@ -63,29 +65,53 @@ export function useOTAUpdate() {
   }, []);
 
   // Apply OTA Update: Cache busting + Service Worker update + instant reload
-  const applyUpdate = useCallback(async () => {
+  const applyUpdate = useCallback(async (forcedVersion?: string) => {
     try {
-      // 1. Clear caches
+      // 1. Clear web caches
       if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        try {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        } catch {
+          // ignore cache clearing errors
+        }
       }
 
-      // 2. Unregister or skipWaiting service workers
+      // 2. Unregister or update service workers
       if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const reg of registrations) {
-          await reg.update();
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const reg of registrations) {
+            await reg.update();
+          }
+        } catch {
+          // ignore
         }
       }
 
       // 3. Update local stored version
-      if (remoteVersionInfo?.version) {
-        localStorage.setItem('lignjolov_installed_version', remoteVersionInfo.version);
+      const targetVersion = forcedVersion || remoteVersionInfo?.version || '1.2.0';
+      if (targetVersion) {
+        localStorage.setItem('lignjolov_installed_version', targetVersion);
+        setCurrentVersion(targetVersion);
       }
 
-      // 4. Reload page cleanly from server
-      window.location.reload();
+      // 4. Reload or redirect to live production app if on mobile APK
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+
+      const isCapacitorOrLocalMobile =
+        (window as any).Capacitor !== undefined ||
+        protocol === 'capacitor:' ||
+        protocol === 'file:' ||
+        (hostname === 'localhost' && port !== '3000' && port !== '5173');
+
+      if (isCapacitorOrLocalMobile) {
+        window.location.href = `${DEFAULT_PRODUCTION_BACKEND}?ota_update=${Date.now()}`;
+      } else {
+        window.location.href = window.location.origin + window.location.pathname + `?ota_update=${Date.now()}`;
+      }
     } catch (err) {
       console.error('Greška pri primjeni ažuriranja:', err);
       window.location.reload();
@@ -106,10 +132,10 @@ export function useOTAUpdate() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', () => checkForUpdates());
 
-    // Interval check every 5 minutes in background
+    // Interval check every 3 minutes in background
     const interval = setInterval(() => {
       checkForUpdates();
-    }, 5 * 60 * 1000);
+    }, 3 * 60 * 1000);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
