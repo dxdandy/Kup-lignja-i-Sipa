@@ -1,0 +1,44 @@
+{
+  "competitionName": "Kup Lignja & Sipa Novi Vinodolski 2026",
+  "location": "Novi Vinodolski (Kvarner, Hrvatska)",
+  "startDate": "2026-11-18",
+  "endDate": "2026-11-22",
+  "members": [
+    {
+      "id": "daniel",
+      "name": "Daniel",
+      "role": "admin",
+      "pin": "2026",
+      "avatarColor": "from-cyan-500 to-blue-600",
+      "boatName": "Kapetan / Admin"
+    },
+    {
+      "id": "dida",
+      "name": "Dida",
+      "role": "member",
+      "pin": "0000",
+      "hasNoSmartphone": true,
+      "managedBy": "daniel",
+      "avatarColor": "from-amber-500 to-orange-600",
+      "boatName": "Stari morski vuk"
+    },
+    {
+      "id": "tuna",
+      "name": "Tuna",
+      "role": "member",
+      "pin": "1234",
+      "avatarColor": "from-blue-600 to-indigo-700",
+      "boatName": "Lovac na kapitalce"
+    },
+    {
+      "id": "silvio",
+      "name": "Silvio",
+      "role": "member",
+      "pin": "9876",
+      "avatarColor": "from-emerald-500 to-teal-700",
+      "boatName": "Majstor za peškafondo"
+    }
+  ],
+  "entries": [],
+  "lastUpdate": "2026-11-11T16:19:00.000Z"
+}
